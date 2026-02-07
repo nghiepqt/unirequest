@@ -6,7 +6,7 @@ export const useRequests = () => useContext(RequestContext);
 
 export const RequestProvider = ({ children }) => {
     const [requests, setRequests] = useState([]);
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/requests/';
+    const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000') + '/api/requests/';
 
     const fetchRequests = async () => {
         try {
