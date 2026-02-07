@@ -27,70 +27,83 @@ const RegisterPage = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
-                <div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <div className="min-h-screen flex items-center justify-center bg-white py-12 px-4 sm:px-6 lg:px-8 font-montserrat">
+            <div className="max-w-md w-full space-y-10 bg-white p-12 rounded-none border border-gray-100 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-vin-red"></div>
+                <div className="text-center">
+                    <h1 className="text-4xl font-black text-vin-blue uppercase tracking-tighter">
+                        Uni<span className="text-vin-red">Request</span>
+                    </h1>
+                    <h2 className="mt-6 text-xl font-bold text-vin-dark uppercase tracking-widest">
                         Tạo Tài Khoản
                     </h2>
-                    <p className="mt-2 text-center text-sm text-gray-600">
-                        Đã có tài khoản? <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">Đăng nhập ngay</Link>
+                    <p className="mt-3 text-sm text-gray-500 font-medium">
+                        Đã có tài khoản? <Link to="/login" className="font-bold text-vin-blue hover:text-vin-red transition-colors underline decoration-2 underline-offset-4">Đăng nhập ngay</Link>
                     </p>
                 </div>
-                <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
-                    {error && <div className="text-red-500 text-sm text-center">{error}</div>}
+                <form className="mt-10 space-y-6" onSubmit={handleSubmit}>
+                    {error && (
+                        <div className="bg-vin-red/10 border-l-4 border-vin-red p-4 animate-shake">
+                            <p className="text-sm font-bold text-vin-red text-center uppercase tracking-wider">{error}</p>
+                        </div>
+                    )}
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <input
-                            type="email"
-                            required
-                            className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        />
-                    </div>
+                    <div className="space-y-5">
+                        <div className="group">
+                            <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 group-focus-within:text-vin-blue transition-colors">Email Address</label>
+                            <input
+                                type="email"
+                                required
+                                placeholder="name@vinuni.edu.vn"
+                                className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-300 text-vin-dark font-medium focus:outline-none focus:ring-1 focus:ring-vin-blue focus:border-vin-blue transition-all"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Họ và Tên</label>
-                        <input
-                            type="text"
-                            required
-                            className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            value={formData.full_name}
-                            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                        />
-                    </div>
+                        <div className="group">
+                            <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 group-focus-within:text-vin-blue transition-colors">Full Name</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="NGUYEN VAN A"
+                                className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-300 text-vin-dark font-medium focus:outline-none focus:ring-1 focus:ring-vin-blue focus:border-vin-blue transition-all uppercase"
+                                value={formData.full_name}
+                                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
-                        <input
-                            type="password"
-                            required
-                            className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            value={formData.password}
-                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        />
-                    </div>
+                        <div className="group">
+                            <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 group-focus-within:text-vin-blue transition-colors">Password</label>
+                            <input
+                                type="password"
+                                required
+                                placeholder="••••••••"
+                                className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-300 text-vin-dark font-medium focus:outline-none focus:ring-1 focus:ring-vin-blue focus:border-vin-blue transition-all"
+                                value={formData.password}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò (Demo)</label>
-                        <select
-                            value={formData.role}
-                            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                            className="block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        >
-                            <option value="student">Sinh viên</option>
-                            <option value="intermediary">Quản lý (Intermediary)</option>
-                            <option value="backoffice">Kỹ thuật (Technician)</option>
-                        </select>
+                        <div className="group">
+                            <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 group-focus-within:text-vin-blue transition-colors">Access Level (Demo)</label>
+                            <select
+                                value={formData.role}
+                                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                className="block w-full px-4 py-3 border border-gray-200 bg-white rounded-none text-sm font-bold text-vin-blue uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-vin-blue focus:border-vin-blue transition-all"
+                            >
+                                <option value="student">STUDENT PORTAL</option>
+                                <option value="intermediary">INTERMEDIARY SYSTEM</option>
+                                <option value="backoffice">TECHNICAL TEAM</option>
+                            </select>
+                        </div>
                     </div>
 
                     <button
                         type="submit"
-                        className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-[11px] font-bold uppercase tracking-[0.2em] text-white bg-vin-blue hover:bg-[#0d3b6b] transition-all shadow-xl active:translate-y-0.5 rounded-none"
                     >
-                        Đăng Ký
+                        Create Account
                     </button>
                 </form>
             </div>

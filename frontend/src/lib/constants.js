@@ -16,5 +16,6 @@ export const REQUEST_STATUS = {
     PENDING: "pending",   // Waiting for Intermediary
     ASSIGNED: "assigned", // Forwarded to Tech
     COMPLETED: "completed",
-    REJECTED: "rejected"
+    REJECTED: "rejected",
+    CANCELLATION_REQUESTED: "cancellation_requested"
 };

@@ -100,9 +100,10 @@ const CalendarView = ({ requests }) => {
                         // Case B: Same User -> Check Hierarchy
                         if (!isRelated(r1, r2)) {
                             // Same User, Same Location, But NOT related -> Double Booking / Mistake
+                            const userName = r1.user_name || `#${user1}`;
                             conflicts.push({
                                 type: 'WARNING',
-                                message: `Cảnh báo: User #${user1} đặt trùng địa điểm cho 2 nhóm yêu cầu khác nhau.`,
+                                message: `Cảnh báo: ${userName} đặt trùng địa điểm cho 2 nhóm yêu cầu khác nhau.`,
                                 items: [r1, r2]
                             });
                         }
@@ -208,7 +209,7 @@ const CalendarView = ({ requests }) => {
                                             <li key={item.id} className="truncate">
                                                 <span className="font-mono text-gray-600">#{item.id}</span>
                                                 <span className="mx-1">-</span>
-                                                User <span className="font-bold">#{item.created_by_id}</span>
+                                                <span className="font-bold">{item.user_name || 'User #' + item.created_by_id}</span>
                                             </li>
                                         ))}
                                     </ul>
@@ -264,7 +265,7 @@ const CalendarView = ({ requests }) => {
                                                             <span className="font-mono text-xs text-blue-600 font-medium">#{group.id}</span>
                                                             {group.created_by_id && (
                                                                 <span className="text-xs text-gray-400 flex items-center">
-                                                                    <User className="w-3 h-3 mr-0.5" />{group.created_by_id}
+                                                                    <User className="w-3 h-3 mr-0.5" />{group.user_name || group.created_by_id}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -327,7 +328,7 @@ const CalendarView = ({ requests }) => {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -6,7 +6,7 @@ export const useRequests = () => useContext(RequestContext);
 
 export const RequestProvider = ({ children }) => {
     const [requests, setRequests] = useState([]);
-    const API_URL = 'http://localhost:8000/api/requests/';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/requests/';
 
     const fetchRequests = async () => {
         try {
@@ -95,8 +95,29 @@ export const RequestProvider = ({ children }) => {
         }
     };
 
+    const deleteRequest = async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                // Refresh to update the list
+                await fetchRequests();
+                return true;
+            }
+        } catch (error) {
+            console.error("Failed to delete request:", error);
+        }
+        return false;
+    };
+
     return (
-        <RequestContext.Provider value={{ requests, addRequest, updateRequestStatus, cancelRequest }}>
+        <RequestContext.Provider value={{ requests, addRequest, updateRequestStatus, cancelRequest, deleteRequest }}>
             {children}
         </RequestContext.Provider>
     );

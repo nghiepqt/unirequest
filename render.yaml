@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: project-assistant-backend
+    env: python
+    buildCommand: pip install -r  backend/requirements.txt
+    startCommand: gunicorn backend.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:10000
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+    plan: free
+    autoDeploy: false

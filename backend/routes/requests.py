@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from ..database import get_session
 from ..models import Request, RequestCreate, RequestRead, RequestUpdate, RequestStatus, User
 from ..auth import get_current_user
@@ -47,8 +47,7 @@ def create_new_request(request: RequestCreate, session: Session, current_user: U
     # Create History Log
     history = [
         {
-            "action": "Created",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "note": f"Request created by {current_user.full_name}"
         }
     ]
@@ -56,7 +55,7 @@ def create_new_request(request: RequestCreate, session: Session, current_user: U
     if is_auto:
         history.append({
             "action": "Auto-Forwarded",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "note": "System auto-forwarded to Technician due to request type"
         })
         
@@ -117,10 +116,17 @@ def update_request(
         current_history = db_request.history
         current_history.append({
             "action": f"Status changed to {request_update.status}",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "note": request_update.note or "Status updated via API"
         })
         db_request.history = current_history
+
+        # CASCADE: If this is an approval for cancellation, cancel children too
+        if request_update.status == RequestStatus.CANCELLED:
+            statement = select(Request).where(Request.parent_id == request_id)
+            children = session.exec(statement).all()
+            for child in children:
+                cancel_single_request(child, RequestStatus.CANCELLED, "Cancelled because parent request was cancelled", session)
         
     session.add(db_request)
     session.commit()
@@ -141,10 +147,18 @@ def cancel_request(
     if db_request.created_by_id != current_user.id:
          raise HTTPException(status_code=403, detail="Not authorized to cancel this request")
          
-    # Cancel Main Request
-    status_update = RequestStatus.CANCELLED
-    note = "Cancelled by user"
-    
+    # Cancel Logic based on Status
+    if db_request.status == RequestStatus.PENDING:
+        status_update = RequestStatus.CANCELLED
+        note = "Cancelled by user (Immediate)"
+    elif db_request.status == RequestStatus.ASSIGNED or db_request.status == RequestStatus.COMPLETED:
+        status_update = RequestStatus.CANCELLATION_REQUESTED
+        note = "Cancellation requested by user (Pending Approval)"
+    elif db_request.status == RequestStatus.CANCELLATION_REQUESTED:
+        raise HTTPException(status_code=400, detail="Cancellation already requested")
+    else:
+         raise HTTPException(status_code=400, detail="Cannot cancel request in this state")
+
     cancel_single_request(db_request, status_update, note, session)
     
     # Cascade Cancel Children
@@ -162,8 +176,44 @@ def cancel_single_request(req: Request, status: str, note: str, session: Session
     current_history = req.history
     current_history.append({
         "action": "Cancelled",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "note": note
     })
     req.history = current_history
     session.add(req)
+@router.delete("/{request_id}")
+def delete_request(
+    request_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    db_request = session.get(Request, request_id)
+    if not db_request:
+        raise HTTPException(status_code=404, detail="Request not found")
+        
+    # Ownership check
+    if db_request.created_by_id != current_user.id:
+         raise HTTPException(status_code=403, detail="Not authorized to delete this request")
+         
+    # Logic: Allow deleting if rejected/cancelled OR if it's an expired CSVC request
+    is_expired_csvc = (
+        db_request.type == "Sử dụng CSVC" and 
+        db_request.end_time and 
+        db_request.end_time.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc)
+    )
+    
+    if db_request.status not in [RequestStatus.REJECTED, RequestStatus.CANCELLED] and not is_expired_csvc:
+        raise HTTPException(
+            status_code=400, 
+            detail="Only rejected, cancelled, or expired CSVC requests can be deleted"
+        )
+
+    # If it's a parent, delete children first
+    statement = select(Request).where(Request.parent_id == request_id)
+    children = session.exec(statement).all()
+    for child in children:
+        session.delete(child)
+        
+    session.delete(db_request)
+    session.commit()
+    return {"detail": "Request deleted successfully"}

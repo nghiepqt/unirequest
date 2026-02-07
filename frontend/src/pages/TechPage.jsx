@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useRequests } from '../context/RequestContext';
-import { REQUEST_STATUS } from '../lib/constants';
+import { REQUEST_STATUS, AUTO_FORWARD_TYPES } from '../lib/constants';
 import { groupRequests } from '../lib/utils';
 import StatsCard from '../components/StatsCard';
 import {
@@ -8,6 +8,7 @@ import {
     ChevronDown, ChevronRight, MoreHorizontal, User, XCircle, Filter
 } from 'lucide-react';
 import { isSameDay, parseISO } from 'date-fns';
+import { formatToLocalTime } from '../utils/dateFormatter';
 
 const TechPage = () => {
     const { requests, updateRequestStatus } = useRequests();
@@ -17,6 +18,7 @@ const TechPage = () => {
     const isAssigned = (req) => req.status === REQUEST_STATUS.ASSIGNED;
     const isCompleted = (req) => req.status === REQUEST_STATUS.COMPLETED;
     const isRejected = (req) => req.status === REQUEST_STATUS.REJECTED;
+    const isCancellationRequested = (req) => req.status === REQUEST_STATUS.CANCELLATION_REQUESTED;
 
     // State
     const [expandedGroups, setExpandedGroups] = useState({});
@@ -40,9 +42,10 @@ const TechPage = () => {
         return { assigned, completedTotal, completedToday };
     }, [requests]);
 
-    // Active Groups: Contains at least one ASSIGNED request
+    // Active Groups: Contains at least one ASSIGNED request OR (CANCELLATION_REQUESTED AND is Auto-Forward Type)
     const activeGroups = groupedRequests.filter(g =>
-        isAssigned(g) || g.children?.some(c => isAssigned(c))
+        isAssigned(g) || (isCancellationRequested(g) && AUTO_FORWARD_TYPES.includes(g.type)) ||
+        g.children?.some(c => isAssigned(c) || (isCancellationRequested(c) && AUTO_FORWARD_TYPES.includes(c.type)))
     );
 
     // History Groups: Completed OR Rejected
@@ -75,46 +78,58 @@ const TechPage = () => {
         if (reason) updateRequestStatus(id, REQUEST_STATUS.REJECTED, reason);
     };
 
+    const handleApproveCancel = (id) => {
+        if (confirm('Xác nhận hủy yêu cầu này?')) {
+            updateRequestStatus(id, 'cancelled', 'Hủy bỏ được chấp thuận bởi Technician');
+        }
+    };
+
+    const handleRejectCancel = (id) => {
+        updateRequestStatus(id, REQUEST_STATUS.ASSIGNED, 'Yêu cầu hủy bị từ chối, tiếp tục thực hiện');
+    };
+
     const RequestItem = ({ req, isChild = false }) => (
-        <div className={`p-3 ${isChild ? 'bg-orange-50/50 border-t border-orange-100' : ''} transition-colors`}>
+        <div className={`p-5 transition-all duration-300 hover:bg-gray-50 ${isChild ? 'bg-gray-50/50 border-t border-gray-100' : ''}`}>
             <div className="flex justify-between items-start">
                 <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                        {isChild && <CornerDownRight className="w-4 h-4 text-gray-400" />}
-                        <span className="font-semibold text-gray-800">{req.type}</span>
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${req.status === 'assigned' ? 'bg-blue-100 text-blue-800' :
-                            req.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                req.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                    'bg-gray-100 text-gray-600'
+                    <div className="flex items-center space-x-2 mb-2">
+                        {isChild && <CornerDownRight className="w-4 h-4 text-vin-blue" />}
+                        <span className="font-bold text-[10px] text-gray-400 uppercase tracking-widest px-1.5 py-0.5 border border-gray-200">#{req.id}</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-none ${req.status === 'assigned' ? 'bg-vin-blue/10 text-vin-blue border border-vin-blue/20' :
+                            req.status === 'completed' ? 'bg-green-50 text-green-700 border border-green-200' :
+                                req.status === 'rejected' ? 'bg-vin-red/10 text-vin-red border border-vin-red/20' :
+                                    req.status === 'cancellation_requested' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200 animate-pulse' :
+                                        'bg-gray-50 text-gray-500 border border-gray-200'
                             }`}>
                             {req.status === 'assigned' ? 'CẦN LÀM' :
                                 req.status === 'completed' ? 'ĐÃ XONG' :
-                                    req.status === 'rejected' ? 'ĐÃ TỪ CHỐI' : req.status}
+                                    req.status === 'rejected' ? 'ĐÃ TỪ CHỐI' :
+                                        req.status === 'cancellation_requested' ? 'YÊU CẦU HỦY' : req.status}
                         </span>
 
                         {/* Creator Info */}
-                        <span className="flex items-center text-xs text-gray-500 border-l border-gray-300 pl-2 ml-2">
-                            <User className="w-3 h-3 mr-1" />
+                        <span className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-wide border-l border-gray-200 pl-3 ml-2">
+                            <User className="w-3.5 h-3.5 mr-1.5 text-vin-blue" />
                             {req.user_name || 'N/A'}
                         </span>
                     </div>
 
-                    <p className="text-sm text-gray-600 mb-1 flex items-center">
-                        <MapPin className="w-3 h-3 mr-1" /> {req.location}
+                    <p className="text-[11px] text-gray-500 mb-1.5 flex items-center font-bold uppercase tracking-widest">
+                        <MapPin className="w-3 h-3 mr-1.5 text-vin-red" /> {req.location}
                     </p>
-                    <p className="text-sm text-gray-700">{req.description}</p>
+                    <p className="text-sm font-semibold text-vin-dark leading-snug">{req.description}</p>
 
                     {req.status === 'rejected' && req.rejection_reason && (
-                        <div className="text-xs text-red-600 mt-1 bg-red-50 p-1 px-2 rounded inline-block">
+                        <div className="mt-2 text-[11px] font-medium text-vin-red bg-vin-red/5 border-l-2 border-vin-red py-1 px-3">
                             Lý do: {req.rejection_reason}
                         </div>
                     )}
 
-                    <div className="text-xs text-gray-400 mt-1">
-                        {new Date(req.created_at).toLocaleString()}
+                    <div className="text-[10px] font-bold text-gray-400 mt-2 flex items-center tracking-widest">
+                        <Clock className="w-3 h-3 mr-1" /> {formatToLocalTime(req.created_at)}
                         {req.status === 'completed' && req.history.length > 0 && (
-                            <span className="text-green-600 ml-2">
-                                (Xong: {new Date(req.history[req.history.length - 1].timestamp).toLocaleTimeString()})
+                            <span className="text-green-600 ml-3 bg-green-50 px-2 py-0.5 border border-green-100 uppercase">
+                                DONE: {formatToLocalTime(req.history[req.history.length - 1].timestamp)}
                             </span>
                         )}
                     </div>
@@ -125,17 +140,36 @@ const TechPage = () => {
                         <>
                             <button
                                 onClick={() => handleComplete(req.id)}
-                                className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1.5 rounded-md text-xs font-bold flex items-center shadow-sm w-full justify-center"
+                                className="bg-vin-blue hover:bg-[#0d3b6b] text-white px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-widest flex items-center shadow-md transition-all w-full justify-center active:translate-y-0.5"
                             >
-                                <CheckSquare className="w-4 h-4 mr-1" />
+                                <CheckSquare className="w-4 h-4 mr-2" />
                                 HOÀN THÀNH
                             </button>
                             <button
                                 onClick={() => handleReject(req.id)}
-                                className="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-md text-xs font-bold flex items-center shadow-sm w-full justify-center"
+                                className="bg-transparent border-2 border-vin-red text-vin-red hover:bg-vin-red hover:text-white px-4 py-2 rounded-none text-[10px] font-bold uppercase tracking-widest flex items-center transition-all w-full justify-center active:translate-y-0.5"
                             >
-                                <XCircle className="w-4 h-4 mr-1" />
+                                <XCircle className="w-4 h-4 mr-2" />
                                 TỪ CHỐI
+                            </button>
+                        </>
+                    )}
+
+                    {req.status === 'cancellation_requested' && (
+                        <>
+                            <button
+                                onClick={() => handleApproveCancel(req.id)}
+                                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-widest flex items-center shadow-md transition-all w-full justify-center active:translate-y-0.5"
+                            >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                DUYỆT HỦY
+                            </button>
+                            <button
+                                onClick={() => handleRejectCancel(req.id)}
+                                className="bg-transparent border-2 border-gray-400 text-gray-500 hover:bg-gray-500 hover:text-white px-4 py-2 rounded-none text-[10px] font-bold uppercase tracking-widest flex items-center transition-all w-full justify-center active:translate-y-0.5"
+                            >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                KHÔNG HỦY
                             </button>
                         </>
                     )}
@@ -172,9 +206,13 @@ const TechPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Active Tasks Column */}
                 <div className="space-y-4">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center border-b pb-2 border-gray-200">
-                        <Wrench className="w-5 h-5 mr-2 text-orange-600" />
-                        Nhiệm Vụ Đang Chờ ({activeGroups.length} nhóm)
+                    <h2 className="text-lg font-bold text-vin-blue flex items-center border-b-2 pb-4 border-vin-blue/10 uppercase tracking-widest relative">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-vin-red"></div>
+                        <Wrench className="w-5 h-5 mr-3 ml-3 text-vin-red" />
+                        Nhiệm Vụ Đang Chờ
+                        <span className="ml-auto text-[10px] font-bold bg-vin-blue text-white px-2 py-1 tracking-widest">
+                            {activeGroups.length} GROUPS
+                        </span>
                     </h2>
 
                     {activeGroups.length === 0 ? (
@@ -195,7 +233,7 @@ const TechPage = () => {
                                 const hiddenChildrenCount = hasChildren ? group.children.length - childrenToShow.length : 0;
 
                                 return (
-                                    <div key={group.id} className="bg-white border-l-4 border-orange-500 shadow-sm rounded-r-lg overflow-hidden border-y border-r border-gray-200">
+                                    <div key={group.id} className="bg-white border-l-4 border-vin-red shadow-sm rounded-none overflow-hidden border-y border-r border-gray-200">
                                         <div className="flex">
                                             {/* Toggle Column */}
                                             <div className="pl-2 pt-4">
@@ -246,31 +284,32 @@ const TechPage = () => {
 
                 {/* Completed History Column */}
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b pb-2 border-gray-200">
-                        <h2 className="text-xl font-bold text-gray-800 flex items-center">
-                            <Clock className="w-5 h-5 mr-2 text-green-600" />
+                    <div className="flex items-center justify-between border-b-2 pb-4 border-vin-blue/10 relative">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-vin-blue"></div>
+                        <h2 className="text-lg font-bold text-vin-blue flex items-center uppercase tracking-widest ml-3">
+                            <Clock className="w-5 h-5 mr-3 text-vin-blue" />
                             Lịch Sử
                         </h2>
 
-                        {/* History Filters */}
-                        <div className="flex space-x-1 bg-gray-100 p-0.5 rounded-lg">
+                        {/* History Filters (VinUni Style) */}
+                        <div className="flex bg-gray-50 border border-gray-200 p-0.5 rounded-none">
                             <button
                                 onClick={() => setHistoryFilter('ALL')}
-                                className={`px-2 py-1 text-xs font-medium rounded ${historyFilter === 'ALL' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                                className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-none transition-all ${historyFilter === 'ALL' ? 'bg-vin-blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
                             >
-                                Tất cả
+                                ALL
                             </button>
                             <button
                                 onClick={() => setHistoryFilter('COMPLETED')}
-                                className={`px-2 py-1 text-xs font-medium rounded ${historyFilter === 'COMPLETED' ? 'bg-white shadow text-green-700' : 'text-gray-500 hover:text-gray-700'}`}
+                                className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-none transition-all ${historyFilter === 'COMPLETED' ? 'bg-vin-blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
                             >
-                                Đã xong
+                                DONE
                             </button>
                             <button
                                 onClick={() => setHistoryFilter('REJECTED')}
-                                className={`px-2 py-1 text-xs font-medium rounded ${historyFilter === 'REJECTED' ? 'bg-white shadow text-red-700' : 'text-gray-500 hover:text-gray-700'}`}
+                                className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-none transition-all ${historyFilter === 'REJECTED' ? 'bg-vin-red text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
                             >
-                                Từ chối
+                                REJ
                             </button>
                         </div>
                     </div>

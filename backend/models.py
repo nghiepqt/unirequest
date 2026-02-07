@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import Field, SQLModel, Relationship
 import json
 from enum import Enum
@@ -9,6 +9,7 @@ class RequestStatus(str, Enum):
     ASSIGNED = "assigned"
     COMPLETED = "completed"
     REJECTED = "rejected"
+    CANCELLATION_REQUESTED = "cancellation_requested"
     CANCELLED = "cancelled"
 
 class UserRole(str, Enum):
@@ -26,7 +27,7 @@ class RequestBase(SQLModel):
 class Request(RequestBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     status: RequestStatus = Field(default=RequestStatus.PENDING)
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     history_json: str = Field(default='[]') 
     rejection_reason: Optional[str] = None
     

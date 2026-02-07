@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useRequests } from '../context/RequestContext';
-import { REQUEST_STATUS } from '../lib/constants';
+import { REQUEST_STATUS, AUTO_FORWARD_TYPES } from '../lib/constants';
 import { groupRequests } from '../lib/utils';
 import StatsCard from '../components/StatsCard';
 import DashboardCharts from '../components/DashboardCharts';
@@ -11,6 +11,7 @@ import {
     ChevronDown, ChevronRight, MoreHorizontal
 } from 'lucide-react';
 import { format, isSameDay, parseISO } from 'date-fns';
+import { formatToLocalTime } from '../utils/dateFormatter';
 import ErrorBoundary from '../components/ErrorBoundary';
 
 const Intermediary = () => {
@@ -89,6 +90,7 @@ const Intermediary = () => {
             case REQUEST_STATUS.COMPLETED: return 'bg-green-100 text-green-800';
             case REQUEST_STATUS.REJECTED: return 'bg-red-100 text-red-800';
             case REQUEST_STATUS.CANCELLED: return 'bg-gray-100 text-gray-800';
+            case REQUEST_STATUS.CANCELLATION_REQUESTED: return 'bg-orange-100 text-orange-800 animate-pulse';
             default: return 'bg-gray-100 text-gray-800';
         }
     };
@@ -99,64 +101,93 @@ const Intermediary = () => {
         if (reason) updateRequestStatus(id, REQUEST_STATUS.REJECTED, reason);
     };
 
+    const handleApproveCancel = (id) => {
+        if (confirm('Xác nhận hủy yêu cầu này?')) {
+            updateRequestStatus(id, 'cancelled', 'Hủy bỏ được chấp thuận bởi Intermediary');
+        }
+    };
+
+    const handleRejectCancel = (id) => {
+        updateRequestStatus(id, REQUEST_STATUS.ASSIGNED, 'Yêu cầu hủy bị từ chối, tiếp tục thực hiện');
+    };
+
     // --- Components ---
     const RequestItem = ({ req, isChild = false }) => (
-        <div className={`p-4 ${isChild ? 'bg-gray-50 border-t border-gray-100' : ''} hover:bg-blue-50/30 transition-colors`}>
+        <div className={`p-5 transition-all duration-300 hover:bg-gray-50 ${isChild ? 'bg-gray-50/50 border-t border-gray-100' : ''}`}>
             <div className="flex justify-between items-start">
                 <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                        {isChild && <CornerDownRight className="w-4 h-4 text-gray-400" />}
-                        <span className="font-mono text-xs text-gray-500">#{req.id}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(req.status)}`}>
+                    <div className="flex items-center space-x-2 mb-2">
+                        {isChild && <CornerDownRight className="w-4 h-4 text-vin-blue" />}
+                        <span className="font-bold text-[10px] text-gray-400 uppercase tracking-widest px-1.5 py-0.5 border border-gray-200">#{req.id}</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-none ${getStatusColor(req.status)}`}>
                             {req.status === 'pending' && 'CHỜ DUYỆT'}
                             {req.status === 'assigned' && 'ĐÃ CHUYỂN'}
                             {req.status === 'completed' && 'HOÀN THÀNH'}
                             {req.status === 'rejected' && 'TỪ CHỐI'}
                             {req.status === 'cancelled' && 'ĐÃ HỦY'}
+                            {req.status === 'cancellation_requested' && 'YÊU CẦU HỦY'}
                         </span>
-                        <span className="text-xs text-gray-400">
-                            {req.created_at ? format(parseISO(req.created_at), 'dd/MM/yyyy HH:mm') : 'N/A'}
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center ml-2 border-l border-gray-200 pl-3">
+                            <Clock className="w-3 h-3 mr-1 text-vin-blue" />
+                            {formatToLocalTime(req.created_at)}
                         </span>
                     </div>
                     <div className={`mt-2 ${isChild ? 'ml-6' : ''}`}>
-                        <div className="flex items-center space-x-2">
-                            <span className="font-medium text-gray-900">{req.type}</span>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-sm text-gray-600 flex items-center">
-                                <MapPin className="w-3 h-3 mr-1" /> {req.location}
+                        <div className="flex items-center space-x-3 mb-1.5">
+                            <span className="text-sm font-bold text-vin-dark uppercase tracking-tight">{req.type}</span>
+                            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                            <span className="text-[11px] font-bold text-gray-500 flex items-center uppercase tracking-widest">
+                                <MapPin className="w-3 h-3 mr-1.5 text-vin-red" /> {req.location}
                             </span>
                         </div>
-                        <p className="text-sm text-gray-700 mt-1">{req.description}</p>
+                        <p className="text-sm text-vin-dark/80 leading-relaxed font-medium">{req.description}</p>
 
                         {req.status === 'rejected' && req.rejection_reason && (
-                            <div className="text-xs text-red-600 mt-1 bg-red-50 p-1 px-2 rounded inline-block">
+                            <div className="mt-2 text-[11px] font-medium text-vin-red bg-vin-red/5 border-l-2 border-vin-red py-1 px-3">
                                 Lý do: {req.rejection_reason}
                             </div>
                         )}
 
                         {req.history && req.history.length > 0 && (
-                            <div className="mt-2 text-xs text-gray-500 flex items-center">
-                                <Clock className="w-3 h-3 mr-1" />
+                            <div className="mt-2 text-[10px] font-bold text-gray-400 flex items-center uppercase tracking-wider bg-gray-50 px-3 py-1 border-l-2 border-gray-200">
+                                <Activity className="w-3 h-3 mr-2" />
                                 {req.history?.length > 0 ? req.history[req.history.length - 1].note : ''}
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="flex flex-col space-y-2 ml-4">
+                <div className="flex flex-col space-y-2 ml-4 min-w-[120px]">
                     {req.status === REQUEST_STATUS.PENDING && (
                         <>
                             <button
                                 onClick={() => handleForward(req.id)}
-                                className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center justify-end px-2 py-1 bg-blue-50 rounded border border-blue-100 hover:bg-blue-100"
+                                className="bg-vin-blue hover:bg-[#0d3b6b] text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center transition-all shadow-md active:translate-y-0.5 rounded-none"
                             >
-                                Duyệt & Chuyển <ArrowRight className="w-3 h-3 ml-1" />
+                                DUYỆT & CHUYỂN <ArrowRight className="w-3 h-3 ml-2" />
                             </button>
                             <button
                                 onClick={() => handleReject(req.id)}
-                                className="text-red-600 hover:text-red-800 text-xs font-medium flex items-center justify-end px-2 py-1 bg-red-50 rounded border border-red-100 hover:bg-red-100"
+                                className="bg-white border-2 border-vin-red text-vin-red hover:bg-vin-red hover:text-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center transition-all active:translate-y-0.5 rounded-none"
                             >
-                                <XCircle className="w-3 h-3 mr-1" /> Từ chối
+                                <XCircle className="w-3 h-3 mr-2" /> TỪ CHỐI
+                            </button>
+                        </>
+                    )}
+
+                    {req.status === 'cancellation_requested' && !AUTO_FORWARD_TYPES.includes(req.type) && (
+                        <>
+                            <button
+                                onClick={() => handleApproveCancel(req.id)}
+                                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center transition-all shadow-md active:translate-y-0.5 rounded-none"
+                            >
+                                <CheckCircle className="w-3 h-3 mr-2" /> DUYỆT HỦY
+                            </button>
+                            <button
+                                onClick={() => handleRejectCancel(req.id)}
+                                className="bg-white border-2 border-gray-400 text-gray-500 hover:bg-gray-500 hover:text-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center transition-all active:translate-y-0.5 rounded-none"
+                            >
+                                <XCircle className="w-3 h-3 mr-2" /> KHÔNG HỦY
                             </button>
                         </>
                     )}
@@ -167,26 +198,32 @@ const Intermediary = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header & Main Tabs */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200 pb-4">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4 md:mb-0">Điều Phối & Giám Sát</h2>
+            {/* Header & Main Tabs (VinUni Style) */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between border-b-2 border-vin-blue/10 pb-6">
+                <div className="flex items-center space-x-4 mb-4 md:mb-0">
+                    <div className="w-1.5 h-10 bg-vin-red"></div>
+                    <div>
+                        <h2 className="text-3xl font-bold text-vin-blue uppercase tracking-tight">Điều phối hệ thống</h2>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-0.5">Control & Management Center</p>
+                    </div>
+                </div>
 
-                <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg self-start md:self-auto">
+                <div className="flex bg-gray-50 border border-gray-200 p-1 rounded-none scale-[0.9] origin-right">
                     <button
                         onClick={() => setActiveTab('dashboard')}
-                        className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-white text-blue-600 shadow' : 'text-gray-500 hover:text-gray-700'
+                        className={`flex items-center px-6 py-2.5 rounded-none text-[11px] font-bold uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-vin-blue text-white shadow-md' : 'text-gray-500 hover:text-gray-700'
                             }`}
                     >
-                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        <LayoutDashboard className="w-3.5 h-3.5 mr-2" />
                         Dashboard
                     </button>
                     <button
                         onClick={() => setActiveTab('list')}
-                        className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'list' ? 'bg-white text-blue-600 shadow' : 'text-gray-500 hover:text-gray-700'
+                        className={`flex items-center px-6 py-2.5 rounded-none text-[11px] font-bold uppercase tracking-widest transition-all ${activeTab === 'list' ? 'bg-vin-blue text-white shadow-md' : 'text-gray-500 hover:text-gray-700'
                             }`}
                     >
-                        <FileText className="w-4 h-4 mr-2" />
-                        Quản Lý Yêu Cầu
+                        <FileText className="w-3.5 h-3.5 mr-2" />
+                        Yêu cầu
                     </button>
                 </div>
             </div>
@@ -213,79 +250,82 @@ const Intermediary = () => {
             {activeTab === 'list' && (
                 <div className="space-y-6 animate-fade-in">
 
-                    {/* View Switcher & Filters */}
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 sticky top-0 z-10">
-                        <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-4">
+                    {/* View Switcher & Filters (VinUni Style) */}
+                    <div className="bg-white p-6 rounded-none shadow-sm border border-gray-200 sticky top-0 z-10 transition-all">
+                        <div className="flex flex-col md:flex-row gap-6 items-center justify-between mb-6">
                             {/* View Switcher */}
-                            <div className="flex bg-gray-100 p-1 rounded-lg">
+                            <div className="flex bg-gray-50 border border-gray-200 p-1 rounded-none">
                                 <button
                                     onClick={() => setViewMode('table')}
-                                    className={`flex items-center px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${viewMode === 'table' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                    className={`flex items-center px-5 py-2 rounded-none text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'table' ? 'bg-white text-vin-blue shadow-sm border border-gray-200' : 'text-gray-400 hover:text-gray-600'
                                         }`}
                                 >
-                                    <Table className="w-4 h-4 mr-2" />
-                                    Bảng
+                                    <Table className="w-3.5 h-3.5 mr-2" />
+                                    LIST
                                 </button>
                                 <button
                                     onClick={() => setViewMode('calendar')}
-                                    className={`flex items-center px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${viewMode === 'calendar' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                    className={`flex items-center px-5 py-2 rounded-none text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'calendar' ? 'bg-white text-vin-blue shadow-sm border border-gray-200' : 'text-gray-400 hover:text-gray-600'
                                         }`}
                                 >
-                                    <Calendar className="w-4 h-4 mr-2" />
-                                    Lịch Biểu
+                                    <Calendar className="w-3.5 h-3.5 mr-2" />
+                                    CALENDAR
                                 </button>
                             </div>
 
                             {/* Filters (Only for Table View) */}
                             {viewMode === 'table' && (
                                 <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                                    <div className="relative flex-1 md:w-64">
-                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                    <div className="relative flex-1 md:w-80">
+                                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                                         <input
                                             type="text"
-                                            placeholder="Tìm kiếm..."
+                                            placeholder="TÌM KIẾM YÊU CẦU..."
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 text-sm"
+                                            className="w-full pl-11 pr-4 py-3 rounded-none border border-gray-200 focus:ring-1 focus:ring-vin-blue focus:border-vin-blue text-[11px] font-bold uppercase tracking-widest placeholder:text-gray-300 transition-all"
                                         />
                                     </div>
                                     <input
                                         type="date"
                                         value={dateFilter}
                                         onChange={(e) => setDateFilter(e.target.value)}
-                                        className="pl-3 pr-2 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 text-sm"
+                                        className="pl-4 pr-3 py-3 rounded-none border border-gray-200 focus:ring-1 focus:ring-vin-blue focus:border-vin-blue text-[11px] font-bold uppercase tracking-widest transition-all"
                                     />
                                 </div>
                             )}
                         </div>
 
-                        {/* Status Tabs (Only for Table View) */}
+                        {/* Status Filter (VinUni Style) */}
                         {viewMode === 'table' && (
-                            <div className="flex space-x-2 overflow-x-auto pb-1">
-                                {['ALL', 'PENDING', 'ASSIGNED', 'COMPLETED', 'REJECTED'].map(status => (
+                            <div className="flex space-x-2 overflow-x-auto pb-1 mt-6">
+                                {['ALL', 'PENDING', 'ASSIGNED', 'COMPLETED', 'REJECTED', 'CANCELLATION_REQUESTED'].map(status => (
                                     <button
                                         key={status}
                                         onClick={() => setStatusFilter(status)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${statusFilter === status
-                                            ? 'bg-gray-800 text-white shadow-sm'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        className={`px-5 py-2.5 rounded-none text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition-all border ${statusFilter === status
+                                            ? 'bg-vin-blue text-white border-vin-blue shadow-md'
+                                            : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
                                             }`}
                                     >
                                         {status === 'ALL' ? 'Tất cả' :
                                             status === 'PENDING' ? 'Chờ duyệt' :
                                                 status === 'ASSIGNED' ? 'Đã chuyển' :
-                                                    status === 'COMPLETED' ? 'Hoàn thành' : 'Đã từ chối'}
+                                                    status === 'COMPLETED' ? 'Hoàn thành' :
+                                                        status === 'REJECTED' ? 'Đã từ chối' : 'Yêu cầu hủy'}
                                     </button>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    {/* View Content */}
+                    {/* View Content (VinUni Style) */}
                     {viewMode === 'table' ? (
-                        <div className="bg-white shadow overflow-hidden rounded-xl border border-gray-200 min-h-[500px]">
-                            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
-                                <h3 className="font-semibold text-gray-700">Danh Sách Yêu Cầu ({filteredGroupedRequests.length})</h3>
+                        <div className="bg-white shadow-sm overflow-hidden rounded-none border border-gray-200 min-h-[500px]">
+                            <div className="bg-white px-8 py-5 border-b-2 border-gray-50 flex justify-between items-center relative">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-vin-blue"></div>
+                                <h3 className="text-lg font-bold text-vin-blue uppercase tracking-widest">Danh sách yêu cầu</h3>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{filteredGroupedRequests.length} ITEMS FOUND</span>
                             </div>
 
                             {filteredGroupedRequests.length === 0 ? (
